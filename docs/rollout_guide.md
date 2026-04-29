@@ -34,20 +34,24 @@ shows it active.
 
 ```bash
 sudo apt update
-sudo apt install -y python3-pip python3-venv git libatlas-base-dev v4l-utils
+sudo apt install -y python3-pip python3-venv git \
+     libopenblas-dev v4l-utils swig \
+     python3-lgpio python3-gpiozero
 
 git clone <your-repo-url> ~/IoT
 cd ~/IoT
 
-python3 -m venv ~/.venvs/surveillance
+# --system-site-packages exposes python3-lgpio and python3-gpiozero inside the venv.
+python3 -m venv --system-site-packages ~/.venvs/surveillance
 source ~/.venvs/surveillance/bin/activate
 
 pip install -r pi_client/requirements.txt
-pip install gpiozero lgpio                # Pi-only GPIO libs
+# gpiozero and lgpio come from the system install above — no separate pip step.
 ```
 
-`lgpio` is the right backend for Bookworm; `RPi.GPIO` is deprecated and
-should NOT be installed.
+`lgpio` is the right backend for Trixie; `RPi.GPIO` is deprecated and
+should NOT be installed. `libatlas-base-dev` was dropped in Trixie —
+`libopenblas-dev` is the replacement for any numpy/scipy native extensions.
 
 ### A3. Configure the Pi client
 

@@ -1,10 +1,11 @@
 # Raspberry Pi provisioning
 
 For Raspberry Pi 4 Model B running our surveillance robot client.
+Tested on **Raspberry Pi OS Lite (64-bit, Trixie / Debian 13)** with Python 3.13.
 
 ## 1. Flash the SD card
 
-Use Raspberry Pi Imager. Pick **Raspberry Pi OS Lite (64-bit, Bookworm)** — we
+Use Raspberry Pi Imager. Pick **Raspberry Pi OS Lite (64-bit, Trixie)** — we
 do not need the desktop. In the imager's advanced settings (gear icon):
 
 - Set hostname (e.g. `surveillance-bot`)
@@ -18,7 +19,12 @@ Eject, boot the Pi, find it on the LAN (router admin or `arp -a`), and SSH in.
 
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y python3-pip python3-venv git libatlas-base-dev v4l-utils
+# libopenblas-dev replaces libatlas-base-dev (dropped in Trixie)
+# python3-lgpio / python3-gpiozero: pip build of lgpio requires liblgpio.so
+#   which isn't packaged separately; use distro packages instead.
+sudo apt install -y python3-pip python3-venv git \
+     libopenblas-dev v4l-utils swig \
+     python3-lgpio python3-gpiozero
 ```
 
 ## 3. Tailscale
@@ -31,12 +37,12 @@ See `docs/tailscale_setup.md`.
 git clone <repo-url> ~/IoT
 cd ~/IoT/pi_client
 
-# Bookworm forces PEP 668; use a venv to keep things clean.
-python3 -m venv ~/.venvs/surveillance
+# --system-site-packages lets the venv see python3-lgpio and python3-gpiozero
+# installed above; without it those packages are invisible inside the venv.
+python3 -m venv --system-site-packages ~/.venvs/surveillance
 source ~/.venvs/surveillance/bin/activate
 pip install -r requirements.txt
-# Then uncomment the Pi-only lines in requirements.txt and re-run:
-pip install gpiozero lgpio
+# gpiozero and lgpio are already present via system packages — no extra pip step.
 ```
 
 ## 5. Configure
