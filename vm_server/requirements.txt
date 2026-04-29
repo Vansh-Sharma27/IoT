@@ -1,0 +1,8 @@
+rpyc>=6.0
+numpy>=1.26
+opencv-python-headless>=4.9
+insightface>=0.7.3
+onnxruntime>=1.17
+ultralytics>=8.2
+PyYAML>=6.0
+pytest>=8.0

@@ -1,0 +1,23 @@
+# vm_server/config.yaml — written by calibrate_threshold.py, read at startup.
+# Edit by hand only if you know what you're doing; prefer re-running calibration.
+
+server:
+  host: "0.0.0.0"        # safe because Tailscale + ufw gate access (see docs/tailscale_setup.md)
+  port: 18861
+  sync_request_timeout: 30
+
+paths:
+  db: "vm_server/db/faces.sqlite"
+  photos_dir: "vm_server/db/photos"
+  models_dir: "vm_server/models"
+
+models:
+  insightface_pack: "buffalo_s"   # SCRFD detector + ArcFace 512-d embedder
+  yolo_weights: "yolov8n.pt"
+  yolo_person_conf: 0.5
+
+matching:
+  # Initial bootstrap value. Run `python -m vm_server.calibrate_threshold`
+  # after enrolling team faces to replace this with a calibrated value.
+  threshold: 0.50
+  target_far: 0.01      # used by calibrate_threshold.py

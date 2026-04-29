@@ -1,0 +1,9 @@
+rpyc>=6.0
+numpy>=1.26
+opencv-python-headless>=4.9
+PyYAML>=6.0
+pytest>=8.0
+
+# Pi-only (uncomment on the Raspberry Pi):
+# gpiozero>=2.0
+# lgpio>=0.2
