@@ -1,6 +1,9 @@
 pi:
-  vm_host: "100.64.0.1"        # set this to the VM's tailscale IP (`tailscale ip -4` on VM)
-  vm_port: 18861
+  # Public URL printed by `cloudflared tunnel --url http://127.0.0.1:8000` on the VM.
+  # If you registered a named tunnel, this is the stable hostname instead.
+  vm_url: "https://CHANGE_ME.trycloudflare.com"
+  # Must match server.secret_token in vm_server/config.yaml.
+  vm_token: "CHANGE_ME"
   hardware_backend: "mock"     # "mock" for VM testing, "real" on the Pi
 
 control:

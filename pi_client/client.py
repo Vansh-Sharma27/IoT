@@ -1,19 +1,19 @@
-"""RPyC client wrapper with reconnect-with-backoff.
+"""HTTP client for the VM vision service (FastAPI + Cloudflare Quick Tunnel).
 
-The robot must keep moving even if the VM link flaps. ``authenticate()``
-returns ``None`` when the VM is unreachable; the state machine treats that as
-"don't know, keep wandering, blink amber" — never as a fatal error.
+Talks to a public ``https://*.trycloudflare.com`` URL that fronts the VM's
+FastAPI server. Bearer-token auth is the only access control on that URL.
+
+Resilience contract: the robot must keep moving even if the VM link flaps.
+``authenticate()`` returns ``None`` on any failure; the state machine treats
+that as "don't know, keep wandering, blink amber" — never as a fatal error.
 """
 
 from __future__ import annotations
 
-import json
 import logging
-import socket
-import time
 from typing import Optional
 
-import rpyc
+import requests
 
 from protocol import AuthResult
 
@@ -21,65 +21,44 @@ log = logging.getLogger(__name__)
 
 
 class VisionClient:
-    def __init__(self, host: str, port: int, timeout: float = 10.0) -> None:
-        self.host = host
-        self.port = port
+    def __init__(self, url: str, token: str, timeout: float = 10.0) -> None:
+        self.base_url = url.rstrip("/")
         self.timeout = timeout
-        self._conn: Optional[rpyc.Connection] = None
-        self._backoff = 0.5
+        self._session = requests.Session()
+        self._session.headers.update({"Authorization": f"Bearer {token}"})
 
-    def _ensure(self) -> Optional[rpyc.Connection]:
-        if self._conn is not None:
-            try:
-                self._conn.ping(timeout=1.0)
-                return self._conn
-            except Exception:
-                log.warning("RPyC ping failed; will reconnect")
-                self._close()
-
+    def _post_bytes(self, path: str, body: bytes) -> Optional[dict]:
         try:
-            self._conn = rpyc.connect(
-                self.host, self.port,
-                config={"sync_request_timeout": self.timeout},
+            r = self._session.post(
+                f"{self.base_url}{path}",
+                data=body,
+                headers={"Content-Type": "application/octet-stream"},
+                timeout=self.timeout,
             )
-            self._backoff = 0.5
-            log.info("RPyC connected to %s:%d", self.host, self.port)
-            return self._conn
-        except (ConnectionRefusedError, socket.error, OSError) as e:
-            log.warning("RPyC connect failed: %s (backoff %.1fs)", e, self._backoff)
-            time.sleep(self._backoff)
-            self._backoff = min(self._backoff * 2, 10.0)
+            r.raise_for_status()
+            return r.json()
+        except requests.RequestException as e:
+            log.warning("POST %s failed: %s", path, e)
             return None
-
-    def _close(self) -> None:
-        try:
-            if self._conn is not None:
-                self._conn.close()
-        except Exception:
-            pass
-        self._conn = None
 
     def authenticate(self, jpeg_bytes: bytes) -> Optional[AuthResult]:
-        conn = self._ensure()
-        if conn is None:
+        data = self._post_bytes("/authenticate", jpeg_bytes)
+        if data is None:
             return None
         try:
-            payload = conn.root.authenticate(jpeg_bytes)
-            return AuthResult.from_dict(json.loads(str(payload)))
-        except Exception as e:
-            log.warning("authenticate RPC failed: %s", e)
-            self._close()
+            return AuthResult.from_dict(data)
+        except (KeyError, ValueError, TypeError) as e:
+            log.warning("authenticate response malformed: %s body=%r", e, data)
             return None
 
     def ping(self) -> bool:
-        conn = self._ensure()
-        if conn is None:
-            return False
         try:
-            return str(conn.root.ping()) == "ok"
-        except Exception:
-            self._close()
+            r = self._session.get(f"{self.base_url}/ping", timeout=self.timeout)
+            r.raise_for_status()
+            return bool(r.json().get("ok"))
+        except requests.RequestException as e:
+            log.warning("ping failed: %s", e)
             return False
 
     def close(self) -> None:
-        self._close()
+        self._session.close()

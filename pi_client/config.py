@@ -12,8 +12,8 @@ import yaml
 
 @dataclass(frozen=True)
 class PiCfg:
-    vm_host: str
-    vm_port: int
+    vm_url: str             # e.g. "https://abc-xyz.trycloudflare.com"
+    vm_token: str           # bearer token shared with vm_server.config.server.secret_token
     hardware_backend: str   # "mock" | "real"
 
 

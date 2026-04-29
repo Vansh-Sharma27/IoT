@@ -12,6 +12,8 @@ build/
 dist/
 
 vm_server/models/
+*.pt
+*.onnx
 vm_server/db/photos/
 vm_server/db/*.sqlite
 vm_server/db/*.sqlite-journal

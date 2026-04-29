@@ -17,7 +17,7 @@ import yaml
 class ServerCfg:
     host: str
     port: int
-    sync_request_timeout: int
+    secret_token: str   # Bearer token required by the FastAPI server. Generate with `openssl rand -hex 24`.
 
 
 @dataclass(frozen=True)

@@ -143,8 +143,8 @@ def main() -> int:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     cfg = load_config()
-    log.info("connecting to VM at %s:%d", cfg.pi.vm_host, cfg.pi.vm_port)
-    client = VisionClient(cfg.pi.vm_host, cfg.pi.vm_port)
+    log.info("connecting to VM at %s", cfg.pi.vm_url)
+    client = VisionClient(cfg.pi.vm_url, cfg.pi.vm_token)
     if client.ping():
         log.info("VM reachable")
     else:

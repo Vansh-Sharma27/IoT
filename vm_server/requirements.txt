@@ -1,4 +1,5 @@
-rpyc>=6.0
+fastapi>=0.115
+uvicorn[standard]>=0.32
 numpy>=1.26
 opencv-python-headless>=4.9
 insightface>=0.7.3
@@ -6,3 +7,5 @@ onnxruntime>=1.17
 ultralytics>=8.2
 PyYAML>=6.0
 pytest>=8.0
+httpx>=0.27         # used by FastAPI's TestClient
+requests>=2.32      # used by enroll_cli to talk to the running server

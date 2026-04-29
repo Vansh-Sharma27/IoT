@@ -2,9 +2,11 @@
 # Edit by hand only if you know what you're doing; prefer re-running calibration.
 
 server:
-  host: "0.0.0.0"        # safe because Tailscale + ufw gate access (see docs/tailscale_setup.md)
-  port: 18861
-  sync_request_timeout: 30
+  host: "127.0.0.1"      # bind locally; cloudflared exposes us via Quick Tunnel
+  port: 8000
+  # Bearer token the Pi must send. Generate with: openssl rand -hex 24
+  # NEVER commit a real token; this placeholder must be replaced before starting the server.
+  secret_token: "CHANGE_ME"
 
 paths:
   db: "vm_server/db/faces.sqlite"

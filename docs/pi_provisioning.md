@@ -27,9 +27,12 @@ sudo apt install -y python3-pip python3-venv git \
      python3-lgpio python3-gpiozero
 ```
 
-## 3. Tailscale
+## 3. Network transport
 
-See `docs/tailscale_setup.md`.
+The Pi reaches the VM over a public Cloudflare Quick Tunnel URL — there is
+nothing to install on the Pi for transport, just `requests` (already in
+`pi_client/requirements.txt`). See `docs/cloudflare_tunnel.md` for the
+VM-side setup.
 
 ## 4. Clone and install
 
@@ -49,7 +52,9 @@ pip install -r requirements.txt
 
 Edit `~/IoT/pi_client/config.yaml`:
 
-- `pi.vm_host`: the VM's tailnet IP (run `tailscale ip -4` on the VM).
+- `pi.vm_url`: the public `https://*.trycloudflare.com` URL printed by
+  `cloudflared` on the VM.
+- `pi.vm_token`: the bearer token (must match `vm_server/config.yaml::server.secret_token`).
 - `pi.hardware_backend`: change `mock` -> `real`.
 - `gpio.*`: match the actual wiring (see pin map below).
 
@@ -116,7 +121,7 @@ Create `/etc/systemd/system/surveillance-robot.service`:
 ```ini
 [Unit]
 Description=Surveillance robot client
-After=network-online.target tailscaled.service
+After=network-online.target
 Wants=network-online.target
 
 [Service]

@@ -1,9 +1,10 @@
-rpyc>=6.0
+requests>=2.32
 numpy>=1.26
 opencv-python-headless>=4.9
 PyYAML>=6.0
 pytest>=8.0
 
-# Pi-only (uncomment on the Raspberry Pi):
-# gpiozero>=2.0
-# lgpio>=0.2
+# Pi-only — installed via apt on Trixie (python3-gpiozero, python3-lgpio)
+# and exposed to the venv via `python3 -m venv --system-site-packages`.
+# Do NOT pip install gpiozero/lgpio on Pi: the lgpio wheel build fails on
+# Trixie because liblgpio.so isn't packaged separately.

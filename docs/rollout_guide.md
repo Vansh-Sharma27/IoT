@@ -1,34 +1,50 @@
 # Rollout guide
 
 End-to-end checklist for taking the codebase from "tests pass on the VM" to
-"robot drives around the lab and authenticates visitors". Written assuming the
-Pi is on your tailnet and Tailscale connectivity is already verified. The USB
-camera is not yet on hand, so steps are split into:
+"robot drives around the lab and authenticates visitors". The transport is
+**FastAPI on the VM, exposed via a Cloudflare Quick Tunnel**, and the Pi
+talks to the public `https://*.trycloudflare.com` URL over HTTPS. There is
+nothing to install on the Pi for transport — `requests` is already in
+`pi_client/requirements.txt`. The USB camera is not yet on hand, so steps are
+split into:
 
-- **Phase A — do now (no camera needed):** install on Pi, prove Pi↔VM RPC,
-  bench-test motors/ultrasonic/LEDs/buzzer.
+- **Phase A — do now (no camera needed):** start the VM service + tunnel,
+  install on Pi, prove Pi↔VM HTTPS, bench-test motors/ultrasonic/LEDs/buzzer.
 - **Phase B — do when camera arrives:** enroll faces, calibrate threshold,
   full closed-loop run.
 
-The VM side is already up (server warmed, listening on `:18861`). All commands
-below run from the Pi unless prefixed with `[VM]`.
+All commands below run from the Pi unless prefixed with `[VM]`.
 
 ---
 
 ## Phase A — bring up the Pi without the camera
 
-### A1. Confirm tailnet reachability
+### A1. VM: start the service and the Cloudflare tunnel
 
 ```bash
-[VM] tailscale ip -4                    # note this — call it $VM_IP
-tailscale status | head                 # both peers should be 'online'
-tailscale ping $VM_IP                   # should succeed in <5 packets
-nc -zv $VM_IP 18861                     # 'succeeded' means port is open via tailnet
+[VM] cd ~/IoT
+# One-time: generate a bearer token, paste it into vm_server/config.yaml
+[VM] openssl rand -hex 24
+# Edit vm_server/config.yaml::server.secret_token (must NOT be CHANGE_ME)
+
+# Start FastAPI on 127.0.0.1:8000
+[VM] PYTHONPATH=. python3 -m vm_server.http_server &
+
+# In a second shell on the VM, open the tunnel.
+# It prints a public https://*.trycloudflare.com URL — copy it; call it $VM_URL.
+[VM] cloudflared tunnel --url http://127.0.0.1:8000
 ```
 
-If `nc` fails: confirm the ufw rule on the VM is
-`sudo ufw allow in on tailscale0 to any port 18861` and that `ufw status`
-shows it active.
+If `cloudflared` is missing, install it per `docs/cloudflare_tunnel.md`. For a
+service that survives reboots, install the systemd unit from that doc instead
+of running `cloudflared` by hand.
+
+Smoke-check from anywhere with internet:
+
+```bash
+curl $VM_URL/ping
+# {"ok":true,"service":"surveillance-vision"}
+```
 
 ### A2. Install the repo on the Pi
 
@@ -59,27 +75,29 @@ Edit `~/IoT/pi_client/config.yaml`:
 
 ```yaml
 pi:
-  vm_host: "<paste $VM_IP from step A1>"
-  vm_port: 18861
+  vm_url: "<paste $VM_URL from step A1>"      # https://*.trycloudflare.com
+  vm_token: "<same value as vm_server config secret_token>"
   hardware_backend: "mock"      # keep mock until Phase A4 passes; switch to "real" in A5
 ```
 
 Leave the `gpio:` and `control:` blocks at their defaults for now. Pin map
 matches `docs/pi_provisioning.md`.
 
-### A4. Smoke-test the RPC link from the Pi (mock hardware)
+### A4. Smoke-test the HTTPS link from the Pi (mock hardware)
 
 ```bash
 cd ~/IoT
 source ~/.venvs/surveillance/bin/activate
 
-# Raw ping — proves the tailnet path + RPyC handshake.
+# Raw ping — proves the public tunnel + bearer auth.
 PYTHONPATH=. python3 -c "
-import rpyc
-c = rpyc.connect('<VM_IP>', 18861, config={'sync_request_timeout': 10})
-print(c.root.ping())
+import requests, yaml
+cfg = yaml.safe_load(open('pi_client/config.yaml'))['pi']
+r = requests.get(cfg['vm_url'] + '/ping', timeout=10,
+                 headers={'Authorization': 'Bearer ' + cfg['vm_token']})
+print(r.status_code, r.json())
 "
-# Expected: ok
+# Expected: 200 {'ok': True, 'service': 'surveillance-vision'}
 ```
 
 Now run the full Pi state machine in mock mode. The mock camera generates
@@ -94,14 +112,15 @@ PYTHONPATH=. python3 -m pi_client.main
 You should see log lines like:
 
 ```
-INFO pi_client.main: connecting to VM at <VM_IP>:18861
+INFO pi_client.main: connecting to VM at https://<random>.trycloudflare.com
 INFO pi_client.main: VM reachable
 INFO pi_client.main: starting main loop; tick=0.050s
 INFO pi_client.main: auth result: non_human name=None sim=None reason=no_person_bbox
 ```
 
-`Ctrl+C` to stop. If you see `auth call failed — VM unreachable`, fix the
-tailnet path before continuing.
+`Ctrl+C` to stop. If you see `auth call failed — VM unreachable`, run the
+`/ping` curl from A1 and confirm both the URL and bearer token are correct in
+`pi_client/config.yaml`.
 
 ### A5. Hardware bring-up (no camera)
 
@@ -236,9 +255,11 @@ no sunglasses). Copy them to the VM, then:
 
 ```bash
 [VM] python3 -c "
-import rpyc, json
-c = rpyc.connect('localhost', 18861)
-print(json.loads(c.root.list_known()))
+import requests, yaml
+cfg = yaml.safe_load(open('vm_server/config.yaml'))['server']
+r = requests.get(f'http://127.0.0.1:{cfg[\"port\"]}/known',
+                 headers={'Authorization': 'Bearer ' + cfg['secret_token']})
+print(r.json())
 "
 ```
 
@@ -273,8 +294,8 @@ smallest threshold where False Accept Rate ≤ 1%, and writes that value into
 `vm_server/config.yaml`. Restart the server so the new threshold loads:
 
 ```bash
-[VM] pkill -f vm_server.server
-[VM] PYTHONPATH=. nohup python3 -m vm_server.server > /tmp/server.log 2>&1 &
+[VM] pkill -f vm_server.http_server
+[VM] PYTHONPATH=. nohup python3 -m vm_server.http_server > /tmp/server.log 2>&1 &
 ```
 
 ### B4. Full closed-loop run
@@ -310,7 +331,7 @@ Once you're happy with the behaviour, install the systemd unit from
 sudo tee /etc/systemd/system/surveillance-robot.service >/dev/null <<'EOF'
 [Unit]
 Description=Surveillance robot client
-After=network-online.target tailscaled.service
+After=network-online.target
 Wants=network-online.target
 
 [Service]
@@ -337,12 +358,14 @@ journalctl -u surveillance-robot -f
 
 | Symptom | First thing to check |
 |---|---|
-| `ConnectionRefusedError` from Pi | VM server alive? `[VM] ss -ltn \| grep 18861` |
-| `nc -zv $VM_IP 18861` hangs | ufw rule on tailscale0 missing |
-| Pi pings VM but RPC times out | server warming up; first call is slow (~3 s) |
+| Pi `/ping` returns 401 | `vm_token` mismatch — must equal `server.secret_token` on VM |
+| Pi `/ping` returns 403 | bearer token wrong; rotate via `openssl rand -hex 24` and update both configs |
+| Pi `/ping` connection error | `cloudflared` died on the VM; check `journalctl -u cloudflared-quick` |
+| New tunnel URL after VM reboot | Quick Tunnels are ephemeral; grep the log for the new `*.trycloudflare.com` and update `pi_client/config.yaml::pi.vm_url`, or switch to a Named Tunnel |
+| Pi reaches VM but request times out | server warming up; first call is slow (~3 s) |
 | `auth call failed — VM unreachable` log line | exception during call; `[VM] tail /tmp/server.log` |
 | Always returns `unknown / no_face` | lighting too dark or face too small in frame |
-| Always returns `non_human` | YOLO confidence too high; lower `models.yolo_conf` in `vm_server/config.yaml` |
+| Always returns `non_human` | YOLO confidence too high; lower `models.yolo_person_conf` in `vm_server/config.yaml` |
 | Robot fires on same person 3× in a row | `control.retry_after_capture_seconds` too short |
 | Motors twitch but don't spin | L298N motor PSU not connected; common-ground missing |
 | HC-SR04 reads always 0 or 200 cm | ECHO divider missing → GPIO toast; check with multimeter |
@@ -354,5 +377,5 @@ journalctl -u surveillance-robot -f
   `pi_client/hardware/real.py` with two more `RealUltrasonic` instances and
   add them to `HardwareBundle`.
 - **Battery monitoring / auto-shutdown** — out of scope.
-- **Live video stream to a dashboard** — would warrant MJPEG over HTTP, not
-  RPyC. Not part of Phase 1.
+- **Live video stream to a dashboard** — would warrant MJPEG over HTTP as a
+  separate FastAPI route. Not part of Phase 1.
