@@ -19,5 +19,11 @@ vm_server/db/*.sqlite
 vm_server/db/*.sqlite-journal
 vm_server/config.local.yaml
 
+# Live config files contain secrets (secret_token) and ephemeral values (vm_url).
+# The checked-in config.yaml files are placeholder templates only (CHANGE_ME).
+# Edit them locally; do NOT commit real values.
+vm_server/config.yaml
+pi_client/config.yaml
+
 .DS_Store
 *.swp
