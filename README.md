@@ -17,7 +17,9 @@ runs on a VM and is reached over HTTPS via a **Cloudflare Quick Tunnel**.
 +-------------------+       HTTPS (TLS)        +--------------------------+
 |  Raspberry Pi 4B  |  POST /authenticate      |             VM            |
 |                   | ---  JPEG bytes  ---->   |                          |
-|  - L298N + motors |                          |  FastAPI vision service  |
+|  - 1×L298N driving|                          |  FastAPI vision service  |
+|    4 motors as 2  |                          |                          |
+|    paired sides   |                          |                          |
 |  - HC-SR04        |  <--- AuthResult JSON ---|   ├ pipeline.authenticate|
 |  - USB camera     |                          |   │   ├ YOLOv8n (person?)|
 |  - buzzer + LEDs  |                          |   │   └ InsightFace      |

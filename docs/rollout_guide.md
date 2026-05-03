@@ -5,15 +5,33 @@ End-to-end checklist for taking the codebase from "tests pass on the VM" to
 **FastAPI on the VM, exposed via a Cloudflare Quick Tunnel**, and the Pi
 talks to the public `https://*.trycloudflare.com` URL over HTTPS. There is
 nothing to install on the Pi for transport — `requests` is already in
-`pi_client/requirements.txt`. The USB camera is not yet on hand, so steps are
-split into:
+`pi_client/requirements.txt`.
 
-- **Phase A — do now (no camera needed):** start the VM service + tunnel,
-  install on Pi, prove Pi↔VM HTTPS, bench-test motors/ultrasonic/LEDs/buzzer.
-- **Phase B — do when camera arrives:** enroll faces, calibrate threshold,
-  full closed-loop run.
+## Friend's first-boot checklist (Pi side, after `git clone`)
 
-All commands below run from the Pi unless prefixed with `[VM]`.
+This is the short version for the team-mate setting up the Pi. Detailed
+explanation is in `docs/pi_provisioning.md`.
+
+```bash
+git clone <repo-url> ~/IoT
+bash ~/IoT/pi_client/deploy/setup.sh        # apt + venv + pip + systemd unit install
+# Edit pi_client/config.yaml: pi.vm_url, pi.vm_token, gpio.* (if rewired).
+sudo systemctl enable --now surveillance-robot
+journalctl -u surveillance-robot -f
+```
+
+Wire 4 motors across the **single** L298N as paired sides (both left motors
+in parallel on Channel A; both right in parallel on Channel B). Full pin
+map in `docs/pi_provisioning.md` §6.
+
+> **Calibration is currently skipped.** We have only 1 photo per enrolled
+> person, but `vm_server/calibrate_threshold.py` needs ≥2. The bootstrap
+> threshold of 0.50 in `vm_server/config.yaml.example` is shipped as-is.
+> If FAR/FRR is bad in the lab, capture 2-3 photos per person with the
+> webcam and re-run `python -m vm_server.calibrate_threshold`.
+
+The rest of this document covers the original phased rollout and is kept
+for reference.
 
 ---
 
@@ -324,33 +342,18 @@ should already be enough).
 
 ### B5. Run on boot (systemd)
 
-Once you're happy with the behaviour, install the systemd unit from
-`docs/pi_provisioning.md` section 8. Quick version:
+Once you're happy with the behaviour, install the unit file shipped in
+the repo:
 
 ```bash
-sudo tee /etc/systemd/system/surveillance-robot.service >/dev/null <<'EOF'
-[Unit]
-Description=Surveillance robot client
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/IoT
-Environment=PYTHONPATH=/home/pi/IoT
-ExecStart=/home/pi/.venvs/surveillance/bin/python -m pi_client.main
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
+sudo install -m 644 ~/IoT/pi_client/deploy/surveillance-robot.service \
+    /etc/systemd/system/surveillance-robot.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now surveillance-robot
 journalctl -u surveillance-robot -f
 ```
+
+(The `pi_client/deploy/setup.sh` one-shot script does this for you.)
 
 ---
 

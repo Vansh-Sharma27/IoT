@@ -50,25 +50,40 @@ pip install -r requirements.txt
 
 ## 5. Configure
 
-Edit `~/IoT/pi_client/config.yaml`:
+The repo ships a template at `pi_client/config.yaml.example`. Copy it
+to the live location (the `setup.sh` script does this for you):
+
+```bash
+cp ~/IoT/pi_client/config.yaml.example ~/IoT/pi_client/config.yaml
+```
+
+Then edit `~/IoT/pi_client/config.yaml`:
 
 - `pi.vm_url`: the public `https://*.trycloudflare.com` URL printed by
   `cloudflared` on the VM.
 - `pi.vm_token`: the bearer token (must match `vm_server/config.yaml::server.secret_token`).
-- `pi.hardware_backend`: change `mock` -> `real`.
+- `pi.hardware_backend`: `real` on the Pi (the example already defaults to this).
 - `gpio.*`: match the actual wiring (see pin map below).
 
 ## 6. Wiring (BCM pin numbers)
 
+> **Hardware note (this build):** 4 wheels = 4 DC motors (12 V, 30 rpm) but
+> only **one working L298N**. The fix: each L298N channel drives **two
+> motors in parallel** — both left motors share Channel A, both right
+> motors share Channel B. Both motors on a side then turn together,
+> giving us a tank-style 2-side drive on a 4-wheel chassis. The
+> `RealMotors` class in `pi_client/hardware/real.py` already speaks this
+> 2-channel API, so no code changes are needed.
+
 ```
-Raspberry Pi 4 (BCM)        Component
+Raspberry Pi 4 (BCM)        L298N (single board) / component
 --------------------        -----------------------------------------
-GPIO 17                     L298N IN1 (left motor forward)
-GPIO 27                     L298N IN2 (left motor backward)
-GPIO 18 (PWM0)              L298N ENA (left motor speed)
-GPIO 22                     L298N IN3 (right motor forward)
-GPIO 23                     L298N IN4 (right motor backward)
-GPIO 13 (PWM1)              L298N ENB (right motor speed)
+GPIO 17                     IN1 — LEFT side forward
+GPIO 27                     IN2 — LEFT side backward
+GPIO 18 (PWM0)              ENA — LEFT side speed (PWM)
+GPIO 22                     IN3 — RIGHT side forward
+GPIO 23                     IN4 — RIGHT side backward
+GPIO 13 (PWM1)              ENB — RIGHT side speed (PWM)
 GPIO 5                      HC-SR04 TRIG (front)
 GPIO 6                      HC-SR04 ECHO (front, via 1k/2k divider!)
 GPIO 25                     Active buzzer +
@@ -77,10 +92,23 @@ GPIO 20                     Green LED (via 220Ω)
 GPIO 21                     Amber LED (via 220Ω)
 5V (pin 2)                  L298N +5V logic / HC-SR04 VCC
 GND (pin 6)                 Common ground (Pi, L298N, HC-SR04, motor PSU)
+
+L298N output side:
+OUT1, OUT2  ->  front-LEFT motor + rear-LEFT  motor (both wired in PARALLEL)
+OUT3, OUT4  ->  front-RIGHT motor + rear-RIGHT motor (both wired in PARALLEL)
 ```
 
-Power the L298N motor side from the Li-ion pack / power bank, **not** the Pi's
-5V rail. Common-ground only.
+**Motor power & current.** Power the L298N motor side from the 12 V
+pack, **not** from the Pi's 5V rail. Common-ground only. Each L298N
+channel is rated 2 A continuous (3 A peak). With two 12 V 30 rpm
+gearmotors paralleled per channel expect ~0.4–0.6 A running and up
+to ~1.2 A on stall — within spec but at the higher end. Use 22 AWG
+or thicker for the motor wires and **remove the L298N's onboard 5V
+regulator jumper** if your supply is >12 V.
+
+**Voltage drop.** L298N H-bridge drops ~1.5–2 V end-to-end, so 12 V
+into the L298N gives ~10 V at the motors. Expected: slightly slower
+than rated 30 rpm. Fine for a slow wandering robot.
 
 USB camera plugs into any USB-2 port; check it appears with `v4l2-ctl --list-devices`.
 
@@ -116,30 +144,18 @@ hw.motors.stop(); hw.shutdown()
 
 ## 8. Run on boot (systemd)
 
-Create `/etc/systemd/system/surveillance-robot.service`:
+The unit file lives in the repo at
+`pi_client/deploy/surveillance-robot.service`. Install it:
 
-```ini
-[Unit]
-Description=Surveillance robot client
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=simple
-User=pi
-WorkingDirectory=/home/pi/IoT
-Environment=PYTHONPATH=/home/pi/IoT
-ExecStart=/home/pi/.venvs/surveillance/bin/python -m pi_client.main
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Enable:
 ```bash
+sudo install -m 644 ~/IoT/pi_client/deploy/surveillance-robot.service \
+    /etc/systemd/system/surveillance-robot.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now surveillance-robot
 journalctl -u surveillance-robot -f
 ```
+
+> The one-shot `bash ~/IoT/pi_client/deploy/setup.sh` script does
+> everything in §2–§5 and §8 in one go (apt install, venv, pip,
+> config template copy, install systemd unit). Run it instead of
+> doing each step by hand if you prefer.

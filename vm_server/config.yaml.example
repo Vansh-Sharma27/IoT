@@ -1,0 +1,30 @@
+# vm_server/config.yaml.example — committed template.
+#
+# On first VM bring-up:
+#   cp vm_server/config.yaml.example vm_server/config.yaml
+#   # then edit vm_server/config.yaml: paste a real secret_token
+#
+# vm_server/config.yaml is gitignored; never commit a real secret_token.
+
+server:
+  host: "127.0.0.1"      # bind locally; cloudflared exposes us via Quick Tunnel
+  port: 8000
+  # Bearer token the Pi must send. Generate with: openssl rand -hex 24
+  # The server refuses to start while this is "CHANGE_ME".
+  secret_token: "CHANGE_ME"
+
+paths:
+  db: "vm_server/db/faces.sqlite"
+  photos_dir: "vm_server/db/photos"
+  models_dir: "vm_server/models"
+
+models:
+  insightface_pack: "buffalo_s"   # SCRFD detector + ArcFace 512-d embedder
+  yolo_weights: "yolov8n.pt"
+  yolo_person_conf: 0.5
+
+matching:
+  # Bootstrap value. Run `python -m vm_server.calibrate_threshold`
+  # once you have >=2 photos per enrolled person to replace this.
+  threshold: 0.50
+  target_far: 0.01      # used by calibrate_threshold.py

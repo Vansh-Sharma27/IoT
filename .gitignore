@@ -25,5 +25,12 @@ vm_server/config.local.yaml
 vm_server/config.yaml
 pi_client/config.yaml
 
+# Enrollment / training photos — never commit faces.
+WIN_*.jpg
+WIN_*.jpeg
+WIN_*.png
+photos/
+calibration_photos/
+
 .DS_Store
 *.swp

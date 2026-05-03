@@ -1,0 +1,55 @@
+# pi_client/config.yaml.example — committed template.
+#
+# On first Pi bring-up (handled by pi_client/deploy/setup.sh):
+#   cp pi_client/config.yaml.example pi_client/config.yaml
+#   # then edit pi_client/config.yaml:
+#   #   - pi.vm_url:   public *.trycloudflare.com URL printed by cloudflared on the VM
+#   #   - pi.vm_token: bearer token, must match vm_server/config.yaml::server.secret_token
+#   #   - gpio.*:      adjust BCM pins to match your wiring
+#
+# pi_client/config.yaml is gitignored; do not commit a real token.
+
+pi:
+  vm_url: "https://CHANGE_ME.trycloudflare.com"
+  vm_token: "CHANGE_ME"
+  hardware_backend: "real"     # "real" on the Pi; "mock" when running on the VM for tests
+
+control:
+  tick_seconds: 0.05
+  forward_speed: 0.4           # 0.0 - 1.0, motor PWM duty
+  turn_speed: 0.45
+  trigger_distance_cm: 80      # within this distance, start counting "stable" time
+  obstacle_distance_cm: 25     # within this distance, treat as a wall and turn
+  stable_seconds: 1.0          # how long target must be ~stationary before capturing
+  stable_delta_cm: 5           # |Δdistance| under this counts as stable
+  retry_after_capture_seconds: 3.0   # don't immediately re-trigger on the same visitor
+
+camera:
+  device_index: 0
+  jpeg_quality: 80
+  width: 640
+  height: 480
+
+# Real-hardware GPIO pin map (BCM numbering). Used only when hardware_backend == "real".
+#
+# Wiring note (4 motors, 1 working L298N):
+#   - Both LEFT motors  -> wired in PARALLEL to L298N Channel A (OUT1, OUT2)
+#       => left_forward / left_backward / left_pwm drive both left wheels together.
+#   - Both RIGHT motors -> wired in PARALLEL to L298N Channel B (OUT3, OUT4)
+#       => right_forward / right_backward / right_pwm drive both right wheels together.
+# See docs/pi_provisioning.md §6 for the full pin map and current-draw notes.
+gpio:
+  motors:
+    left_forward: 17     # L298N IN1
+    left_backward: 27    # L298N IN2
+    left_pwm: 18         # L298N ENA (hardware PWM)
+    right_forward: 22    # L298N IN3
+    right_backward: 23   # L298N IN4
+    right_pwm: 13        # L298N ENB (hardware PWM)
+  ultrasonic_front:
+    trigger: 5
+    echo: 6              # via 1k/2k voltage divider to step 5V echo down to 3.3V
+  buzzer: 25
+  led_red: 16
+  led_green: 20
+  led_amber: 21

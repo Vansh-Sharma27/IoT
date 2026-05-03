@@ -1,0 +1,16 @@
+[Unit]
+Description=Surveillance robot vision service (FastAPI on 127.0.0.1:8000)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/IoT
+Environment=PYTHONPATH=/home/ubuntu/IoT
+ExecStart=/home/ubuntu/IoT/.venv/bin/python -m vm_server.http_server
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

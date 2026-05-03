@@ -1,0 +1,16 @@
+[Unit]
+Description=Surveillance robot client (Pi state machine)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/IoT
+Environment=PYTHONPATH=/home/pi/IoT
+ExecStart=/home/pi/.venvs/surveillance/bin/python -m pi_client.main
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

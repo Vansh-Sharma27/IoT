@@ -1,0 +1,22 @@
+# Cloudflare Quick Tunnel for the FastAPI vision service.
+#
+# Quick Tunnel URLs CHANGE on every restart. After (re)starting this unit:
+#   grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /var/log/cloudflared-quick.log | tail -1
+# and copy that value into pi_client/config.yaml::pi.vm_url on the Pi.
+
+[Unit]
+Description=Cloudflare Quick Tunnel for FastAPI vision service
+After=network-online.target surveillance-vision.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/cloudflared tunnel --url http://127.0.0.1:8000 --no-autoupdate
+Restart=on-failure
+RestartSec=5
+User=ubuntu
+StandardOutput=append:/var/log/cloudflared-quick.log
+StandardError=append:/var/log/cloudflared-quick.log
+
+[Install]
+WantedBy=multi-user.target
