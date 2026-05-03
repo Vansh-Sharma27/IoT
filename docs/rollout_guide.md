@@ -30,6 +30,26 @@ map in `docs/pi_provisioning.md` §6.
 > If FAR/FRR is bad in the lab, capture 2-3 photos per person with the
 > webcam and re-run `python -m vm_server.calibrate_threshold`.
 
+> **Pipeline gating caveat (verified 2026-05-03 against 18 random web
+> images):** The pipeline runs YOLOv8n at `yolo_person_conf=0.5` *before*
+> the face model, so an image with no detected `person` bbox short-circuits
+> to `NON_HUMAN` and the face model never runs. This is fine for the bot's
+> operational scenario — at the ~80 cm trigger distance the USB camera
+> captures upper-body, which YOLO detects reliably — but tight headshots
+> (cropped to face only, no shoulders) are mis-classified as `NON_HUMAN`.
+> If you observe spurious `non_human` decisions in the lab, lower
+> `models.yolo_person_conf` to `0.3` in `vm_server/config.yaml`. Verified
+> behaviour on the test set:
+>
+> | Input bucket | n | Pipeline output |
+> |---|---|---|
+> | Enrolled face photos | 3 | 3× `ALLOWED` with correct name, similarity ≈ 1.0 |
+> | Random unknown faces (mid-shot) | 4 | 4× `DENIED` `unknown_face` |
+> | Empty chairs / landscapes | 3 | 3× `NON_HUMAN` `no_person_bbox` |
+> | Animal close-ups (cat / dog) | 3 | 3× `NON_HUMAN` `no_person_bbox` |
+> | Group photos with small/distant faces | 3 | 2× `UNKNOWN` `no_face`, 1× `NON_HUMAN` |
+> | Tight sunglasses headshots | 2 | 2× `NON_HUMAN` (false negative — see above) |
+
 The rest of this document covers the original phased rollout and is kept
 for reference.
 
