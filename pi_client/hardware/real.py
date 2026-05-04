@@ -26,8 +26,11 @@ class RealMotors(Motors):
     def __init__(self, pins: dict) -> None:
         from gpiozero import Motor, PWMOutputDevice
 
-        self._left = Motor(forward=pins["left_forward"], backward=pins["left_backward"])
-        self._right = Motor(forward=pins["right_forward"], backward=pins["right_backward"])
+        # pwm=False: direction pins are plain digital outputs (OutputDevice).
+        # ENA/ENB are jumpered HIGH so speed is always full duty — no PWM needed
+        # on the direction lines, and software-PWM fallback causes erratic behaviour.
+        self._left = Motor(forward=pins["left_forward"], backward=pins["left_backward"], pwm=False)
+        self._right = Motor(forward=pins["right_forward"], backward=pins["right_backward"], pwm=False)
         left_pwm_pin = pins.get("left_pwm")
         right_pwm_pin = pins.get("right_pwm")
         self._left_pwm = PWMOutputDevice(left_pwm_pin) if left_pwm_pin is not None else None
