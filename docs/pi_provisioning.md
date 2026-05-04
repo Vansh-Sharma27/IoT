@@ -78,24 +78,33 @@ Then edit `~/IoT/pi_client/config.yaml`:
 ```
 Raspberry Pi 4 (BCM)        L298N (single board) / component
 --------------------        -----------------------------------------
-GPIO 17                     IN1 — LEFT side forward
-GPIO 27                     IN2 — LEFT side backward
-GPIO 18 (PWM0)              ENA — LEFT side speed (PWM)
-GPIO 22                     IN3 — RIGHT side forward
-GPIO 23                     IN4 — RIGHT side backward
-GPIO 13 (PWM1)              ENB — RIGHT side speed (PWM)
+GPIO 2                      IN1 — RIGHT side forward
+GPIO 3                      IN2 — RIGHT side backward
+GPIO 14                     IN3 — LEFT side forward
+GPIO 4                      IN4 — LEFT side backward
+(ENA / ENB)                 jumpered HIGH on the L298N — no PWM pin wired,
+                            motors run at full duty (forward_speed /
+                            turn_speed in config.yaml are ignored).
 GPIO 5                      HC-SR04 TRIG (front)
 GPIO 6                      HC-SR04 ECHO (front, via 1k/2k divider!)
 GPIO 25                     Active buzzer +
 GPIO 16                     Red LED (via 220Ω)
 GPIO 20                     Green LED (via 220Ω)
 GPIO 21                     Amber LED (via 220Ω)
-5V (pin 2)                  L298N +5V logic / HC-SR04 VCC
-GND (pin 6)                 Common ground (Pi, L298N, HC-SR04, motor PSU)
+3.3V (pin 1)                HC-SR04 VCC
+5V (pin 4)                  L298N +5V logic
+GND (pin 6)                 L298N GND / common ground (Pi, L298N, HC-SR04, motor PSU)
+GND (pin 39)                LED ground rail
+```
+
+> **GPIO 2/3 caveat.** These are the I²C pins (SDA1/SCL1) and have
+> 1.8 kΩ pull-ups to 3.3 V on the Pi board. They work fine as plain
+> GPIO outputs into the L298N's high-impedance inputs — just don't
+> enable I²C in `raspi-config` while these pins are in use.
 
 L298N output side:
-OUT1, OUT2  ->  front-LEFT motor + rear-LEFT  motor (both wired in PARALLEL)
-OUT3, OUT4  ->  front-RIGHT motor + rear-RIGHT motor (both wired in PARALLEL)
+OUT1, OUT2  ->  front-RIGHT motor + rear-RIGHT motor (both wired in PARALLEL)
+OUT3, OUT4  ->  front-LEFT  motor + rear-LEFT  motor (both wired in PARALLEL)
 ```
 
 **Motor power & current.** Power the L298N motor side from the 12 V

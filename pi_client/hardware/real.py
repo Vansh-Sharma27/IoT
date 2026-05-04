@@ -19,17 +19,25 @@ log = logging.getLogger(__name__)
 
 class RealMotors(Motors):
     """L298N driver via gpiozero.Motor. Each side has a forward/backward pin
-    pair and a hardware-PWM enable pin for speed control."""
+    pair. ENA/ENB PWM pins are optional — if `left_pwm`/`right_pwm` are absent
+    from the config (e.g. ENA/ENB jumpered high on the board), the driver runs
+    at full duty and the speed argument is ignored."""
 
     def __init__(self, pins: dict) -> None:
         from gpiozero import Motor, PWMOutputDevice
 
         self._left = Motor(forward=pins["left_forward"], backward=pins["left_backward"])
         self._right = Motor(forward=pins["right_forward"], backward=pins["right_backward"])
-        self._left_pwm = PWMOutputDevice(pins["left_pwm"])
-        self._right_pwm = PWMOutputDevice(pins["right_pwm"])
+        left_pwm_pin = pins.get("left_pwm")
+        right_pwm_pin = pins.get("right_pwm")
+        self._left_pwm = PWMOutputDevice(left_pwm_pin) if left_pwm_pin is not None else None
+        self._right_pwm = PWMOutputDevice(right_pwm_pin) if right_pwm_pin is not None else None
+        if self._left_pwm is None or self._right_pwm is None:
+            log.info("ENA/ENB PWM pins not configured; motors will run at full duty")
 
     def _pwm(self, speed: float) -> None:
+        if self._left_pwm is None or self._right_pwm is None:
+            return
         s = max(0.0, min(1.0, float(speed)))
         self._left_pwm.value = s
         self._right_pwm.value = s

@@ -33,19 +33,23 @@ camera:
 # Real-hardware GPIO pin map (BCM numbering). Used only when hardware_backend == "real".
 #
 # Wiring note (4 motors, 1 working L298N):
-#   - Both LEFT motors  -> wired in PARALLEL to L298N Channel A (OUT1, OUT2)
-#       => left_forward / left_backward / left_pwm drive both left wheels together.
-#   - Both RIGHT motors -> wired in PARALLEL to L298N Channel B (OUT3, OUT4)
-#       => right_forward / right_backward / right_pwm drive both right wheels together.
+#   - Both LEFT motors  -> wired in PARALLEL to L298N Channel B (OUT3, OUT4)
+#       => left_forward / left_backward drive both left wheels together.
+#   - Both RIGHT motors -> wired in PARALLEL to L298N Channel A (OUT1, OUT2)
+#       => right_forward / right_backward drive both right wheels together.
+#   - ENA/ENB are jumpered HIGH — no speed control, full duty only.
 # See docs/pi_provisioning.md §6 for the full pin map and current-draw notes.
 gpio:
   motors:
-    left_forward: 17     # L298N IN1
-    left_backward: 27    # L298N IN2
-    left_pwm: 18         # L298N ENA (hardware PWM)
-    right_forward: 22    # L298N IN3
-    right_backward: 23   # L298N IN4
-    right_pwm: 13        # L298N ENB (hardware PWM)
+    # Default mapping reflects current build: IN3/IN4 -> left, IN1/IN2 -> right.
+    # ENA/ENB are jumpered high on the L298N (no PWM); leave left_pwm/right_pwm
+    # commented out and RealMotors will skip PWM and run at full duty.
+    left_forward: 14     # L298N IN3
+    left_backward: 4     # L298N IN4
+    right_forward: 2     # L298N IN1
+    right_backward: 3    # L298N IN2
+    # left_pwm: 18       # L298N ENA — uncomment if you wire ENA to a PWM-capable GPIO
+    # right_pwm: 13      # L298N ENB — uncomment if you wire ENB to a PWM-capable GPIO
   ultrasonic_front:
     trigger: 5
     echo: 6              # via 1k/2k voltage divider to step 5V echo down to 3.3V
